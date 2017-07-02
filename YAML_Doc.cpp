@@ -31,8 +31,8 @@ YAML_Doc::~YAML_Doc(void){
 */
 string YAML_Doc::generateYAML(){
   string yaml;
-  yaml =  yaml + "Mini-Application Name: " + miniAppName + "\n";
-  yaml =  yaml + "Mini-Application Version: " + miniAppVersion + "\n";
+  yaml =  yaml + "Mini-Application Name_" + miniAppName + "\n";
+  yaml =  yaml + "Mini-Application Version_" + miniAppVersion + "\n";
   for(size_t i=0; i<children.size(); i++){
     yaml = yaml + children[i]->printYAML("");
   }
@@ -43,7 +43,7 @@ string YAML_Doc::generateYAML(){
   ptm = localtime(&rawtime);
   char sdate[25];
   //use tm_mon+1 because tm_mon is 0 .. 11 instead of 1 .. 12
-  sprintf (sdate,"%04d:%02d:%02d-%02d:%02d:%02d",ptm->tm_year + 1900, ptm->tm_mon+1,
+  sprintf (sdate,"%04d_%02d_%02d__%02d_%02d_%02d",ptm->tm_year + 1900, ptm->tm_mon+1,
     ptm->tm_mday, ptm->tm_hour, ptm->tm_min,ptm->tm_sec);
 
   string filename;
