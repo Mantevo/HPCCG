@@ -47,8 +47,10 @@
 #
 # 0) Specify compiler and linker:
 
-CXX=/usr/local/bin/g++
-LINKER=/usr/local/bin/g++
+include config.mk
+
+#CXX=
+LINKER=mpicxx
 #CXX=mpicxx
 #LINKER=mpicxx
 
@@ -57,7 +59,7 @@ LINKER=/usr/local/bin/g++
 #    If you want to run the program with MPI, make sure USE_MPI is set 
 #    to -DUSING_MPI
 
-USE_MPI =
+USE_MPI = -DUSING_MPI
 #USE_MPI = -DUSING_MPI
 
 
@@ -68,7 +70,7 @@ USE_MPI =
 #    - Are not using MPI compiler wrappers
 #    Then specify the path to your MPI header file (include a -I)
 
-#MPI_INC = -I/usr/MPICH/SDK.gcc/include
+MPI_INC = -I/opt/amazon/openmpi/include
 
 
 # 3) Specify C++ compiler optimization flags (if any)
@@ -76,8 +78,9 @@ USE_MPI =
 #    enhance performance.
 
 #IA32 with GCC: 
-#CPP_OPT_FLAGS = -O3 -funroll-all-loops -malign-double
-CPP_OPT_FLAGS = -O3 -ftree-vectorize -ftree-vectorizer-verbose=2
+##CPP_OPT_FLAGS = -O3 -funroll-all-loops -malign-double
+#CPP_OPT_FLAGS = -O3 -ftree-vectorize -ftree-vectorizer-verbose=2
+CPP_OPT_FLAGS = $(CFLAGS_OPT) -g # not supported
 
 #
 # 4) MPI library:
@@ -87,7 +90,7 @@ CPP_OPT_FLAGS = -O3 -ftree-vectorize -ftree-vectorizer-verbose=2
 #    - Are not using MPI compiler wrappers for linking
 #    Then specify the path to your MPI library (include -L and -l directives)
 
-#MPI_LIB = -L/usr/MPICH/SDK.gcc/lib -lmpich
+MPI_LIB = -L/opt/amazon/openmpi/lib
 
 #
 # 5) Build with OpenMP or not?
@@ -108,7 +111,7 @@ USE_OMP =
 # 7) System libraries: (May need to add -lg2c before -lm)
 
 SYS_LIB =-lm
-
+ARMPL_LIB = -larmpl -L/shared/arm/armpl/armpl_22.0.2_gcc-11.2/lib
 #
 # 6) Specify name if executable (optional):
 
@@ -116,7 +119,7 @@ TARGET = test_HPCCG
 
 ################### Derived Quantities (no modification required) ##############
 
-CXXFLAGS= $(CPP_OPT_FLAGS) $(OMP_FLAGS) $(USE_OMP) $(USE_MPI) $(MPI_INC)
+CXXFLAGS= $(CPP_OPT_FLAGS) $(OMP_FLAGS) $(CXXFLAGS_LIBRARY) $(USE_OMP) $(USE_MPI) $(MPI_INC) $(VEC_FLAG)
 
 LIB_PATHS= $(SYS_LIB)
 
@@ -129,7 +132,7 @@ TEST_CPP = main.cpp generate_matrix.cpp read_HPC_row.cpp \
 TEST_OBJ          = $(TEST_CPP:.cpp=.o)
 
 $(TARGET): $(TEST_OBJ)
-	$(LINKER) $(CPP_OPT_FLAGS) $(OMP_FLAGS) $(TEST_OBJ) $(LIB_PATHS) -o $(TARGET)
+	$(LINKER) $(CPP_OPT_FLAGS) $(OMP_FLAGS) $(TEST_OBJ) $(LIB_PATHS) $(ARMPL_LIB) -o $(TARGET)
 
 test:
 	@echo "Not implemented yet..."
