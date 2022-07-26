@@ -155,6 +155,26 @@ int main(int argc, char *argv[])
     ny = atoi(argv[2]);
     nz = atoi(argv[3]);
     generate_matrix(nx, ny, nz, &A, &x, &b, &xexact);
+  }
+  else
+  {
+    read_HPC_row(argv[1], &A, &x, &b, &xexact);
+  }
+
+
+  bool dump_matrix = false;
+  if (dump_matrix && size<=4) dump_matlab_matrix(A, rank);
+
+#ifdef USING_MPI
+
+  // Transform matrix indices from global to local values.
+  // Define number of columns for the local matrix.
+
+  t6 = mytimer(); make_local_matrix(A);  t6 = mytimer() - t6;
+  times[6] = t6;
+
+#endif
+
 #if defined(USE_ARMPL)
     // use nnz_in_row[M] to populate row_start[M+1]
     int* row_start = new int[A->local_nrow+1];
@@ -203,25 +223,6 @@ int main(int argc, char *argv[])
     }
 
     free(row_start);
-#endif
-  }
-  else
-  {
-    read_HPC_row(argv[1], &A, &x, &b, &xexact);
-  }
-
-
-  bool dump_matrix = false;
-  if (dump_matrix && size<=4) dump_matlab_matrix(A, rank);
-
-#ifdef USING_MPI
-
-  // Transform matrix indices from global to local values.
-  // Define number of columns for the local matrix.
-
-  t6 = mytimer(); make_local_matrix(A);  t6 = mytimer() - t6;
-  times[6] = t6;
-
 #endif
 
   double t1 = mytimer();   // Initialize it (if needed)
@@ -340,7 +341,7 @@ int main(int argc, char *argv[])
   //        << residual << ".\n" << endl;
 
 #if defined(USE_ARMPL) 
-	armpl_status_t info = armpl_spmat_destroy(A->mat_armpl);
+	info = armpl_spmat_destroy(A->mat_armpl);
 	  if (info!=ARMPL_STATUS_SUCCESS) 
     {
       cerr << "ERROR: armpl_spmat_destroy returned %d\n";
