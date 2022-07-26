@@ -43,6 +43,11 @@
 #ifndef HPC_SPARSE_MATRIX_H
 #define HPC_SPARSE_MATRIX_H
 
+#if defined(USE_ARMPL)
+#include <armpl.h>
+#define LIBRARY_NAME "ArmPL"
+#endif
+
 // These constants are upper bounds that might need to be changes for 
 // pathological matrices, e.g., those with nearly dense rows/columns.
 
@@ -64,6 +69,10 @@ struct HPC_Sparse_Matrix_STRUCT {
   double ** ptr_to_vals_in_row;
   int ** ptr_to_inds_in_row;
   double ** ptr_to_diags;
+
+#if defined(USE_ARMPL) 
+  armpl_spmat_t mat_armpl;
+#endif
 
 #ifdef USING_MPI
   int num_external;

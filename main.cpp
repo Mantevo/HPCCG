@@ -90,12 +90,17 @@ using std::endl;
 #include "YAML_Element.hpp"
 #include "YAML_Doc.hpp"
 
+#if defined(USE_ARMPL)
+#include <armpl.h>
+#define LIBRARY_NAME "ArmPL"
+#endif
+
 #undef DEBUG
 
 int main(int argc, char *argv[])
 {
 
-  HPC_Sparse_Matrix *A;
+  HPC_Sparse_Matrix *A;  
   double *x, *b, *xexact;
   double norm, d;
   int ierr = 0;
@@ -150,6 +155,55 @@ int main(int argc, char *argv[])
     ny = atoi(argv[2]);
     nz = atoi(argv[3]);
     generate_matrix(nx, ny, nz, &A, &x, &b, &xexact);
+#if defined(USE_ARMPL)
+    // use nnz_in_row[M] to populate row_start[M+1]
+    int* row_start = new int[A->local_nrow+1];
+    row_start[0] = 0;
+    for(int i =0; i<A->local_nrow; ++i)
+      row_start[i+1] = row_start[i] + A->nnz_in_row[i];
+
+	  // Arm Performance Libraries sparse matrix object in csr format
+    int creation_flags = 0;
+    armpl_status_t info = armpl_spmat_create_csr_d(&A->mat_armpl, A->local_nrow, A->local_ncol, row_start, A->list_of_inds, A->list_of_vals, creation_flags);
+	  if (info!=ARMPL_STATUS_SUCCESS) 
+    {
+      cerr << "ERROR: armpl_spmat_create_csr_d returned %d\n";
+      exit(1);
+    }
+
+	  /* 3a. Supply any pertinent information that is known about the matrix */
+	  info = armpl_spmat_hint(A->mat_armpl, ARMPL_SPARSE_HINT_STRUCTURE, ARMPL_SPARSE_STRUCTURE_UNSTRUCTURED);
+	  if (info!=ARMPL_STATUS_SUCCESS) 
+    {
+      cerr << "ERROR: armpl_spmat_hint returned %d\n";
+      exit(1);
+    }
+
+	  /* 3b. Supply any hints that are about the SpMV calculations to be performed */
+	  info = armpl_spmat_hint(A->mat_armpl, ARMPL_SPARSE_HINT_SPMV_OPERATION, ARMPL_SPARSE_OPERATION_NOTRANS);
+	  if (info!=ARMPL_STATUS_SUCCESS) 
+    {
+      cerr << "ERROR: armpl_spmat_hint returned %d\n";
+      exit(1);
+    }
+
+	  info = armpl_spmat_hint(A->mat_armpl, ARMPL_SPARSE_HINT_SPMV_INVOCATIONS, ARMPL_SPARSE_INVOCATIONS_MANY);
+	  if (info!=ARMPL_STATUS_SUCCESS) 
+    {
+      cerr << "ERROR: armpl_spmat_hint returned %d\n";
+      exit(1);
+    }
+
+	  /* 4. Call an optimization process that will learn from the hints you have previously supplied */
+	  info = armpl_spmv_optimize(A->mat_armpl);
+	  if (info!=ARMPL_STATUS_SUCCESS) 
+    {
+      cerr << "ERROR: armpl_spmv_optimize returned %d\n";
+      exit(1);
+    }
+
+    free(row_start);
+#endif
   }
   else
   {
@@ -175,6 +229,7 @@ int main(int argc, char *argv[])
   double normr = 0.0;
   int max_iter = 150;
   double tolerance = 0.0; // Set tolerance to zero to make all runs do max_iter iterations
+
   ierr = HPCCG( A, b, x, max_iter, tolerance, niters, normr, times);
 
 	if (ierr) cerr << "Error in call to CG: " << ierr << ".\n" << endl;
@@ -284,7 +339,14 @@ int main(int argc, char *argv[])
   //   cout << "Difference between computed and exact  = " 
   //        << residual << ".\n" << endl;
 
-
+#if defined(USE_ARMPL) 
+	armpl_status_t info = armpl_spmat_destroy(A->mat_armpl);
+	  if (info!=ARMPL_STATUS_SUCCESS) 
+    {
+      cerr << "ERROR: armpl_spmat_destroy returned %d\n";
+      exit(1);
+    }
+#endif
   // Finish up
 #ifdef USING_MPI
   MPI_Finalize();
