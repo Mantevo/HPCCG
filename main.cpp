@@ -1,4 +1,4 @@
-//
+
 //@HEADER
 // ************************************************************************
 // 
@@ -90,6 +90,11 @@ using std::endl;
 #include "YAML_Element.hpp"
 #include "YAML_Doc.hpp"
 
+#if defined(USE_ARMPL)
+#include <armpl.h>
+#define LIBRARY_NAME "ArmPL"
+#endif
+
 #undef DEBUG
 
 int main(int argc, char *argv[])
@@ -170,24 +175,73 @@ int main(int argc, char *argv[])
 
 #endif
 
+#if defined(USE_ARMPL)
+  // use nnz_in_row[M] to populate row_start[M+1]
+  int* row_start = new int[A->local_nrow+1];
+  row_start[0] = 0;
+  for(int i =0; i<A->local_nrow; ++i)
+    row_start[i+1] = row_start[i] + A->nnz_in_row[i];
+
+	// create Arm Performance Libraries sparse matrix object in csr format
+  int creation_flags = 0;
+  armpl_status_t info = armpl_spmat_create_csr_d(&A->mat_armpl, A->local_nrow, A->local_ncol, row_start, A->list_of_inds, A->list_of_vals, creation_flags);
+	if (info!=ARMPL_STATUS_SUCCESS) 
+  {
+    cerr << "ERROR: armpl_spmat_create_csr_d returned %d\n";
+    exit(1);
+  }
+
+  info = armpl_spmat_hint(A->mat_armpl, ARMPL_SPARSE_HINT_STRUCTURE, ARMPL_SPARSE_STRUCTURE_UNSTRUCTURED);
+	if (info!=ARMPL_STATUS_SUCCESS) 
+  {
+    cerr << "ERROR: armpl_spmat_hint returned %d\n";
+    exit(1);
+  }
+
+	info = armpl_spmat_hint(A->mat_armpl, ARMPL_SPARSE_HINT_SPMV_OPERATION, ARMPL_SPARSE_OPERATION_NOTRANS);
+	if (info!=ARMPL_STATUS_SUCCESS) 
+  {
+    cerr << "ERROR: armpl_spmat_hint returned %d\n";
+    exit(1);
+  }
+
+	info = armpl_spmat_hint(A->mat_armpl, ARMPL_SPARSE_HINT_SPMV_INVOCATIONS, ARMPL_SPARSE_INVOCATIONS_MANY);
+	if (info!=ARMPL_STATUS_SUCCESS) 
+  {
+    cerr << "ERROR: armpl_spmat_hint returned %d\n";
+    exit(1);
+  }
+
+	// Call an optimization process that will learn from the hints you have previously supplied 
+  info = armpl_spmv_optimize(A->mat_armpl);
+	if (info!=ARMPL_STATUS_SUCCESS) 
+  {
+    cerr << "ERROR: armpl_spmv_optimize returned %d\n";
+    exit(1);
+  }
+
+  free(row_start);
+#endif
+
   double t1 = mytimer();   // Initialize it (if needed)
   int niters = 0;
   double normr = 0.0;
   int max_iter = 150;
   double tolerance = 0.0; // Set tolerance to zero to make all runs do max_iter iterations
+
   ierr = HPCCG( A, b, x, max_iter, tolerance, niters, normr, times);
 
 	if (ierr) cerr << "Error in call to CG: " << ierr << ".\n" << endl;
 
 #ifdef USING_MPI
-      double t4 = times[4];
-      double t4min = 0.0;
-      double t4max = 0.0;
-      double t4avg = 0.0;
-      MPI_Allreduce(&t4, &t4min, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
-      MPI_Allreduce(&t4, &t4max, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-      MPI_Allreduce(&t4, &t4avg, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-      t4avg = t4avg/((double) size);
+  double t4 = times[4];
+  double t4min = 0.0;
+  double t4max = 0.0;
+  double t4avg = 0.0;
+  MPI_Allreduce(&t4, &t4min, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
+  MPI_Allreduce(&t4, &t4max, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+  MPI_Allreduce(&t4, &t4avg, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  t4avg = t4avg/((double) size);
 #endif
 
 // initialize YAML doc
@@ -207,24 +261,24 @@ int main(int argc, char *argv[])
       doc.add("Parallelism","");
 
 #ifdef USING_MPI
-          doc.get("Parallelism")->add("Number of MPI ranks",size);
+      doc.get("Parallelism")->add("Number of MPI ranks",size);
 #else
-          doc.get("Parallelism")->add("MPI not enabled","");
+      doc.get("Parallelism")->add("MPI not enabled","");
 #endif
 
 #ifdef USING_OMP
-          int nthreads = 1;
+      int nthreads = 1;
 #pragma omp parallel
-          nthreads = omp_get_num_threads();
-          doc.get("Parallelism")->add("Number of OpenMP threads",nthreads);
+      nthreads = omp_get_num_threads();
+      doc.get("Parallelism")->add("Number of OpenMP threads",nthreads);
 #else
-          doc.get("Parallelism")->add("OpenMP not enabled","");
+      doc.get("Parallelism")->add("OpenMP not enabled","");
 #endif
 
       doc.add("Dimensions","");
-	  doc.get("Dimensions")->add("nx",nx);
-	  doc.get("Dimensions")->add("ny",ny);
-	  doc.get("Dimensions")->add("nz",nz);
+	    doc.get("Dimensions")->add("nx",nx);
+	    doc.get("Dimensions")->add("ny",ny);
+	    doc.get("Dimensions")->add("nz",nz);
 
 
 
@@ -284,7 +338,14 @@ int main(int argc, char *argv[])
   //   cout << "Difference between computed and exact  = " 
   //        << residual << ".\n" << endl;
 
-
+#if defined(USE_ARMPL) 
+	info = armpl_spmat_destroy(A->mat_armpl);
+	if (info!=ARMPL_STATUS_SUCCESS) 
+  {
+    cerr << "ERROR: armpl_spmat_destroy returned %d\n";
+    exit(1);
+  }
+#endif
   // Finish up
 #ifdef USING_MPI
   MPI_Finalize();

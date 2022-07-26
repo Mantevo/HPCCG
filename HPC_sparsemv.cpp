@@ -63,12 +63,27 @@ using std::endl;
 #include <cmath>
 #include "HPC_sparsemv.hpp"
 
+#if defined(USE_ARMPL)
+#include <armpl.h>
+#define LIBRARY_NAME "ArmPL"
+#endif
+
 int HPC_sparsemv( HPC_Sparse_Matrix *A, 
 		 const double * const x, double * const y)
 {
 
   const int nrow = (const int) A->local_nrow;
 
+#if defined(USE_ARMPL)
+  double alpha = 1.0, beta = 0.0;
+  armpl_status_t info = armpl_spmv_exec_d(ARMPL_SPARSE_OPERATION_NOTRANS, alpha, A->mat_armpl, x, beta, y);
+	if (info!=ARMPL_STATUS_SUCCESS) 
+  {
+    cerr << "ERROR: armpl_spmv_exec_d returned %d\n";
+    exit(1);
+  }
+
+#else
 #ifdef USING_OMP
 #pragma omp parallel for
 #endif
@@ -87,5 +102,7 @@ int HPC_sparsemv( HPC_Sparse_Matrix *A,
           sum += cur_vals[j]*x[cur_inds[j]];
       y[i] = sum;
     }
+#endif
   return(0);
 }
+
