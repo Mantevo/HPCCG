@@ -80,7 +80,7 @@ MPI_INC = -I/opt/amazon/openmpi/include
 #IA32 with GCC: 
 ##CPP_OPT_FLAGS = -O3 -funroll-all-loops -malign-double
 #CPP_OPT_FLAGS = -O3 -ftree-vectorize -ftree-vectorizer-verbose=2
-CPP_OPT_FLAGS = $(CFLAGS_OPT) -g # not supported
+CPP_OPT_FLAGS = $(CFLAGS_OPT)    # add -g for profiler 
 
 #
 # 4) MPI library:
@@ -111,9 +111,16 @@ USE_OMP =
 # 7) System libraries: (May need to add -lg2c before -lm)
 
 SYS_LIB =-lm
-ARMPL_LIB = -larmpl -L/shared/arm/armpl/armpl_22.0.2_gcc-11.2/lib
+
 #
-# 6) Specify name if executable (optional):
+# 8) Arm PL library 
+ARMPL_LIB = -larmpl -L/shared/arm/armpl/armpl_22.0.2_gcc-11.2/lib
+
+# 9) VEC_FLAG
+# to invoke manual vectorization code (NEON or SVE)
+
+#
+# 10) Specify name if executable (optional):
 
 TARGET = test_HPCCG
 

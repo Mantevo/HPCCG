@@ -75,14 +75,13 @@ int HPC_sparsemv( HPC_Sparse_Matrix *A,
   const int nrow = (const int) A->local_nrow;
 
 #if defined(USE_ARMPL)
-    double alpha = 1.0, beta = 0.0;
-
-    armpl_status_t info = armpl_spmv_exec_d(ARMPL_SPARSE_OPERATION_NOTRANS, alpha, A->mat_armpl, x, beta, y);
-	  if (info!=ARMPL_STATUS_SUCCESS) 
-    {
-      cerr << "ERROR: armpl_spmv_exec_d returned %d\n";
-      exit(1);
-    }
+  double alpha = 1.0, beta = 0.0;
+  armpl_status_t info = armpl_spmv_exec_d(ARMPL_SPARSE_OPERATION_NOTRANS, alpha, A->mat_armpl, x, beta, y);
+	if (info!=ARMPL_STATUS_SUCCESS) 
+  {
+    cerr << "ERROR: armpl_spmv_exec_d returned %d\n";
+    exit(1);
+  }
 
 #else
 #ifdef USING_OMP
