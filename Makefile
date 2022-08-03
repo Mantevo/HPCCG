@@ -116,17 +116,14 @@ SYS_LIB =-lm
 # 8) Arm PL library 
 ARMPL_LIB = -larmpl -L/shared/arm/armpl/armpl_22.0.2_gcc-11.2/lib
 
-# 9) VEC_FLAG
-# to invoke manual vectorization code (NEON or SVE)
-
 #
-# 10) Specify name if executable (optional):
+# 9) Specify name if executable (optional):
 
 TARGET = test_HPCCG
 
 ################### Derived Quantities (no modification required) ##############
 
-CXXFLAGS= $(CPP_OPT_FLAGS) $(OMP_FLAGS) $(CXXFLAGS_LIBRARY) $(USE_OMP) $(USE_MPI) $(MPI_INC) $(VEC_FLAG)
+CXXFLAGS= $(CPP_OPT_FLAGS) $(OMP_FLAGS) $(CXXFLAGS_LIBRARY) $(USE_OMP) $(USE_MPI) $(MPI_INC) 
 
 LIB_PATHS= $(SYS_LIB)
 
