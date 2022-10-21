@@ -79,9 +79,10 @@ MPI_INC = -I/opt/amazon/openmpi/include
 
 #IA32 with GCC: 
 ##CPP_OPT_FLAGS = -O3 -funroll-all-loops -malign-double
-#CPP_OPT_FLAGS = -O3 -ftree-vectorize -ftree-vectorizer-verbose=2
+CPP_OPT_FLAGS = -O3 -ftree-vectorize -ftree-vectorizer-verbose=2
+ifeq (arm,$(COMPILER))
 CPP_OPT_FLAGS = $(CFLAGS_OPT)    # add -g for profiler 
-
+endif
 #
 # 4) MPI library:
 #    If you:
@@ -114,8 +115,9 @@ SYS_LIB =-lm
 
 #
 # 8) Arm PL library 
+ifeq (arm,$(COMPILER))
 ARMPL_LIB = -larmpl -L/shared/arm/armpl/armpl_22.0.2_gcc-11.2/lib
-
+endif
 #
 # 9) Specify name if executable (optional):
 
