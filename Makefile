@@ -81,7 +81,7 @@ MPI_INC = -I/opt/amazon/openmpi/include
 ##CPP_OPT_FLAGS = -O3 -funroll-all-loops -malign-double
 CPP_OPT_FLAGS = -O3 -ftree-vectorize -ftree-vectorizer-verbose=2
 ifeq (arm,$(COMPILER))
-CPP_OPT_FLAGS = $(CFLAGS_OPT)    # add -g for profiler 
+CPP_OPT_FLAGS = $(CFLAGS_OPT) -fPIC    # add -g for profiler 
 endif
 #
 # 4) MPI library:
