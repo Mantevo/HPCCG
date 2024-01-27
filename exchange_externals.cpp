@@ -48,6 +48,13 @@ using std::endl;
 #include <cstdio>
 #include "exchange_externals.hpp"
 #undef DEBUG
+
+/**
+ * A method to exchange external data between MPI processes.
+ *
+ * @param A The sparse matrix currently being computed.
+ * @param x The vector to extend by data from other MPI processes.
+ */
 void exchange_externals(HPC_Sparse_Matrix * A, const double *x)
 {
   int i, j, k;

@@ -39,25 +39,21 @@
 // 
 // ************************************************************************
 //@HEADER
-/////////////////////////////////////////////////////////////////////////
-
-// Routine to compute the update of a vector with the sum of two 
-// scaled vectors where:
-
-// w = alpha*x + beta*y
-
-// n - number of vector elements (on this processor)
-
-// x, y - input vectors
-
-// alpha, beta - scalars applied to x and y respectively.
-
-// w - output vector.
-
-/////////////////////////////////////////////////////////////////////////
 
 #include "waxpby.hpp"
 
+/**
+ * A method to compute the update of a vector with the sum of two scaled
+ * vectors.
+ *
+ * @param n The length of both vectors.
+ * @param alpha The scaling factor for the first vector, `x`.
+ * @param x The first input vector.
+ * @param beta The scaling factor for the second vector, `y`.
+ * @param y The second input vector.
+ * @param w A mutable pointer, updated to contain the result `w = alpha*x + beta*y`.
+ * @return An exit code of zero on success.
+ */
 int waxpby (const int n, const double alpha, const double * const x, 
 	    const double beta, const double * const y, 
 		     double * const w)

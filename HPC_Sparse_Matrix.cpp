@@ -39,14 +39,18 @@
 // 
 // ************************************************************************
 //@HEADER
+
 #include "HPC_Sparse_Matrix.hpp"
 
 #ifdef USING_MPI
 #include <mpi.h>
 #endif
 
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
+/**
+ * A method to clean up the memory of the sparse matrix.
+ *
+ * @param A A pointer to the sparse matrix to clean up.
+ */
 void destroyMatrix(HPC_Sparse_Matrix * &A)
 {
   if(A->title)
@@ -196,4 +200,3 @@ void destroySharedMemMatrix(HPC_Sparse_Matrix * &A)
 #endif
 #endif
 ////////////////////////////////////////////////////////////////////////////////
-
