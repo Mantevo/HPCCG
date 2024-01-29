@@ -39,22 +39,23 @@
 // 
 // ************************************************************************
 //@HEADER
-/////////////////////////////////////////////////////////////////////////
-
-// Routine to dump matrix in row, col, val format for analysis with Matlab
-// Writes to mat.dat
-// NOTE:  THIS CODE ONLY WORKS ON SINGLE PROCESSOR RUNS
-// Read into matlab using:
-//   load mat.dat
-//   A=spconvert(mat);
-
-// A - known matrix 
-
-/////////////////////////////////////////////////////////////////////////
 
 #include <cstdio>
 #include "dump_matlab_matrix.hpp"
 
+/**
+ * A method to dump matrix in (row, col, val) format for analysis with Matlab
+ *
+ * @note <b>This code only works on single processor runs</b>
+ *
+ * This writes the data out to a file called `mat.dat`, which can then be read
+ * into MatLab using: \code{.cpp} load mat.dat A = spconvert(mat) \endcode
+ *
+ * @param A The sparse matrix to dump
+ * @param rank The suffix for the output file name, between zero and three.
+ * @return An exit code of zero on success (includes no file written if `rank<0`
+ *         or `rank>3`).
+ */
 int dump_matlab_matrix( HPC_Sparse_Matrix *A, int rank) {
   const int nrow = A->local_nrow;
   int start_row = nrow*rank; // Each processor gets a section of a chimney stack domain

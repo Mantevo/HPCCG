@@ -55,6 +55,12 @@ using std::endl;
 #include "make_local_matrix.hpp"
 #include "mytimer.hpp"
 //#define DEBUG
+
+/**
+ * A method to set up communication between local matrices by MPI.
+ *
+ * @param A The local sparse matrix to set up for MPI communication.
+ */
 void make_local_matrix(HPC_Sparse_Matrix * A)
 {
   std::map< int, int > externals;

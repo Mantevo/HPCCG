@@ -40,17 +40,6 @@
 // ************************************************************************
 //@HEADER
 
-/////////////////////////////////////////////////////////////////////////
-
-// Routine to compute matrix vector product y = Ax where:
-// First call exchange_externals to get off-processor values of x
-
-// A - known matrix 
-// x - known vector
-// y - On exit contains Ax.
-
-/////////////////////////////////////////////////////////////////////////
-
 #include <iostream>
 using std::cout;
 using std::cerr;
@@ -63,6 +52,30 @@ using std::endl;
 #include <cmath>
 #include "HPC_sparsemv.hpp"
 
+/**
+ * A method to compute the matrix-vector product `y = Ax`.
+ *
+ * @note In MPI, first call exchange_externals to get off-processor values of x.
+ *
+ * The input matrix to the function is stored in compressed-sparse column form.
+ * Hence, `cur_vals` is a pointer to a slice of the `list_of_vals` array, which
+ * then contains an ordered array of the non-zero values in the current row.
+ * `cur_inds` equivalently is an ordered array of the indices of those values in
+ * the current row. `cur_nnz` is the number of non-zeroes in the array (hence
+ * the length of both `cur_vals` and `cur_inds` array slices, as the
+ * `list_of_vals/inds` arrays are non-homogenous in sub-array length, and don't
+ * have termination to split the sub-arrays up).
+ *
+ * Hence, the matrix-vector multiplication is an array containing the products
+ * of those non-zero values with their pairs in the input vector, for each rown
+ * in the input matrix and vector.
+ *
+ * @param A The input sparse matrix.
+ * @param x The input vector.
+ * @param y A pointer to a vector, which is updated to contain the calculated
+ *          product `Ax`.
+ * @return An exit code of zero on success.
+ */
 int HPC_sparsemv( HPC_Sparse_Matrix *A, 
 		 const double * const x, double * const y)
 {

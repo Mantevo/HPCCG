@@ -40,26 +40,6 @@
 // ************************************************************************
 //@HEADER
 
-// Main routine of a program that reads a sparse matrix, right side
-// vector, solution vector and initial guess from a file  in HPC
-// format.  This program then calls the HPCCG conjugate gradient
-// solver to solve the problem, and then prints results.
-
-// Calling sequence:
-
-// test_HPCCG linear_system_file
-
-// Routines called:
-
-// read_HPC_row - Reads in linear system
-
-// mytimer - Timing routine (compile with -DWALL to get wall clock
-//           times
-
-// HPCCG - CG Solver
-
-// compute_residual - Compares HPCCG solution to known solution.
-
 #include <iostream>
 using std::cout;
 using std::cerr;
@@ -92,6 +72,39 @@ using std::endl;
 
 #undef DEBUG
 
+/**
+ * The driver code for the calculating the conjugate gradient.
+ *
+ * Main routine of a program that reads a sparse matrix, right side
+ * vector, solution vector and initial guess from a file in HPC
+ * format. This program then calls the HPCCG conjugate gradient
+ * solver to solve the problem, and then prints results.
+ *
+ * 1. Get the matrix, right hand side vector, exact solution vector, and
+ *    initial guess - either from a file, or generated as a specified size.
+ * 2. Call the HPCCG conjugate gradient solver on the matrix and associated
+ * data.
+ * 3. Print the result of the solver, and information about the performance
+ *    of the computation.
+ *
+ * Routines called:
+ *  - `read_HPC_row`, reads in linear system.
+ *  - `mytimer`, timing routine (compile with -DWALL to get wall clock times).
+ *  - `HPCCG`, conjugate gradient solver.
+ *  - `compute_residual`, compares HPCCG solution to known solution.
+ *
+ * Command line usage:
+ * - Mode 1, to generate matrix data of a specified size:
+ *   - `./test_HPCCG nx ny nz` where nx, ny and nz are the local sub-block
+ * dimensions
+ * - Mode 2, to read an existing matrix from a file:
+ *   - `./test_HPCCG HPC_data_file` where HPC_data_file is a globally accessible
+ * file containing matrix data.
+ *
+ * @param argc The number of command line arguments.
+ * @param argv An array of the command line arguments.
+ * @return An exit code of zero on success.
+ */
 int main(int argc, char *argv[])
 {
 

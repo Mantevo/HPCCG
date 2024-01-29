@@ -40,22 +40,23 @@
 // ************************************************************************
 //@HEADER
 
-/////////////////////////////////////////////////////////////////////////
-
-// Routine to compute the 1-norm difference between two vectors where:
-
-// n - number of vector elements (on this processor)
-
-// v1, v2 - input vectors
-
-// residual - pointer to scalar value, on exit will contain result.
-
-/////////////////////////////////////////////////////////////////////////
-
 #include <cmath>  // needed for fabs
 using std::fabs;
 #include "compute_residual.hpp"
 
+/**
+ * A method to compute the 1-norm difference between two vectors.
+ *
+ * The 1-norm difference of two vectors is the largest absolute difference
+ * between two values of the same index across the two vectors.
+ *
+ * @param n The number of vector elements (on this processor).
+ * @param v1 The first input vector.
+ * @param v2 The second input vector.
+ * @param residual A pointer to a scalar value, which is updated to contain the
+ *                 calculated residual.
+ * @return An exit code of zero on success.
+ */
 int compute_residual(const int n, const double * const v1, 
 		     const double * const v2, double * const residual)
 {
