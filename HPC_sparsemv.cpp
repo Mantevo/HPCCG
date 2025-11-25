@@ -64,8 +64,6 @@ using std::endl;
 #include <filesystem>
 #include "HPC_sparsemv.hpp"
 
-#include "tenstorrent/rtl/lib/ellpack_matVec.hpp"
-
 void HPC_sparsemv( HPC_Sparse_Matrix *A, 
 		 const float * const x, float * const y)
 {
@@ -83,19 +81,6 @@ void HPC_sparsemv( HPC_Sparse_Matrix *A,
   //   }
 
   // ELLPACK
-#ifdef USING_TT_RTL
-  tt::daisy::ELLPACKMatVecParams params;
-  params.vals = A->ellpack_vals;
-  params.inds = A->ellpack_inds;
-  params.nrow = A->nrow;
-  params.ncol = A->ncol;
-  params.ellpack_nnz = A->ellpack_nnz;
-  params.ellpack_cols = A->ellpack_cols;
-  params.row_min_cols = A->ellpack_row_min_cols;
-  params.row_max_cols = A->ellpack_row_max_cols;
-  params.hw_impl = tt::daisy::EllpackHwImpl::FPU;
-  tt::daisy::tt_ellpack_matVec(params, x, y);
-#else
   const int nrow = (const int) A->nrow;
   const int ncol_per_row = (const int) A->ellpack_cols;
   for (int i=0; i< nrow; i++)
@@ -106,6 +91,4 @@ void HPC_sparsemv( HPC_Sparse_Matrix *A,
       }
       y[i] = sum;
     }
-#endif
 }
-

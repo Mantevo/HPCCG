@@ -12,13 +12,15 @@
 #include <tt-metalium/tensor_accessor_args.hpp>
 #include <tt-metalium/tt_metal.hpp>
 
+#define PAGE_SIZE 1024u
+
 namespace tt::daisy {
 
 // Global device pointer
-static tt_metal::IDevice* g_device = nullptr;
+static tt::tt_metal::IDevice* g_device = nullptr;
 
 // Initialize the global device
-static tt_metal::IDevice* get_device() {
+static tt::tt_metal::IDevice* get_device() {
     if (g_device == nullptr) {
         g_device = tt_metal::CreateDevice(0);
         // Register cleanup function to run at program exit
@@ -118,7 +120,7 @@ void tt_launch_ellpack_matVecOp(
     auto ell_used_cols = ellpack_cols;
     auto ell_tiles_total = (cell_count + 31u) / 32u;
     auto data_format = tt::DataFormat::Float32;
-    uint32_t ell_tile_page_size = tt_metal::detail::TileSize(data_format);
+    uint32_t ell_tile_page_size = tt::tt_metal::detail::TileSize(data_format);
     int vector_page_size = 1024;
     auto vec_entries_per_chunk = vector_page_size / 4u;
     auto vec_tile_h_per_chunk = vec_entries_per_chunk / 32u;
@@ -385,25 +387,157 @@ void tt_launch_ellpack_matVecOp(
     tt_metal::EnqueueProgram(device->command_queue(0), program, false);
 }
 
-void tt_ellpack_matVec(const ELLPACKMatVecParams& params, const float * x, float * y)
+void tt_spmv_ellpack(const ELLPACKMatVecParams& params, const float * x, float * y)
 {
-  tt_metal::IDevice* device = get_device();
-  
-  // Tilize matrix values and indices
-  std::vector<float> tilized_vals;
-  tilize_buffer(tilized_vals, params.vals, params.nrow, params.ellpack_cols, params.ellpack_cols, 0.0f);
-  
-  std::vector<uint32_t> tilized_inds;
-  // Cast int* to uint32_t* for tilize_buffer
-  tilize_buffer(tilized_inds, (const uint32_t*)params.inds, params.nrow, params.ellpack_cols, params.ellpack_cols, (uint32_t)UINT32_MAX);
+    _ZN2tt5daisy23tt_ellpack_matVec(
+        params.vals,
+        params.inds,
+        params.nrow,
+        params.ncol,
+        params.ellpack_nnz,
+        params.ellpack_cols,
+        params.row_min_cols,
+        params.row_max_cols,
+        x,
+        y
+    );
+}
 
-  // Create buffers for matrix values and indices
+}   // namespace tt::daisy
+
+void _ZN2tt5daisy23tt_ellpack_matVec(
+    const float * vals,
+    const int * inds,
+    int nrow,
+    int ncol,
+    int ellpack_nnz,
+    int ellpack_cols,
+    const uint32_t* row_min_cols,
+    const uint32_t* row_max_cols,
+    const float * x,
+    float * y
+)
+{
+    tt::tt_metal::IDevice* device = tt::daisy::get_device();
+
+    // Copy-in vals
+    void * d_ellpack_vals = _ZN2tt5daisy23tt_ellpack_matVec_in_0(
+        vals,
+        inds,
+        nrow,
+        ncol,
+        ellpack_nnz,
+        ellpack_cols,
+        row_min_cols,
+        row_max_cols,
+        x,
+        y
+    );
+
+    // Copy-in inds
+    void * d_ellpack_addrs = _ZN2tt5daisy23tt_ellpack_matVec_in_1(
+        vals,
+        inds,
+        nrow,
+        ncol,
+        ellpack_nnz,
+        ellpack_cols,
+        row_min_cols,
+        row_max_cols,
+        x,
+        y
+    );
+
+    // Copy-in x
+    void * d_inVec = _ZN2tt5daisy23tt_ellpack_matVec_in_8(
+        vals,
+        inds,
+        nrow,
+        ncol,
+        ellpack_nnz,
+        ellpack_cols,
+        row_min_cols,
+        row_max_cols,
+        x,
+        y
+    );
+
+    // Allocate output y
+    void * d_resVec = _ZN2tt5daisy23tt_ellpack_matVec_in_9(
+        vals,
+        inds,
+        nrow,
+        ncol,
+        ellpack_nnz,
+        ellpack_cols,
+        row_min_cols,
+        row_max_cols,
+        x,
+        y
+    );
+
+    // Launch kernel
+    _ZN2tt5daisy23tt_ellpack_matVec_kernel(
+        vals,
+        inds,
+        nrow,
+        ncol,
+        ellpack_nnz,
+        ellpack_cols,
+        row_min_cols,
+        row_max_cols,
+        x,
+        y,
+        d_ellpack_vals,
+        d_ellpack_addrs,
+        d_inVec,
+        d_resVec
+    );
+
+    // Copy-out y
+    _ZN2tt5daisy23tt_ellpack_matVec_out_9(
+        vals,
+        inds,
+        nrow,
+        ncol,
+        ellpack_nnz,
+        ellpack_cols,
+        row_min_cols,
+        row_max_cols,
+        x,
+        y,
+        d_resVec
+    );
+
+    delete static_cast<std::shared_ptr<tt::tt_metal::Buffer>*>(d_ellpack_vals);
+    delete static_cast<std::shared_ptr<tt::tt_metal::Buffer>*>(d_ellpack_addrs);
+    delete static_cast<std::shared_ptr<tt::tt_metal::Buffer>*>(d_inVec);
+    delete static_cast<std::shared_ptr<tt::tt_metal::Buffer>*>(d_resVec);
+}
+
+std::shared_ptr<tt::tt_metal::Buffer> _ZN2tt5daisy23tt_ellpack_matVec_in_0_impl(
+    const float * vals,
+    const int * inds,
+    int nrow,
+    int ncol,
+    int ellpack_nnz,
+    int ellpack_cols,
+    const uint32_t* row_min_cols,
+    const uint32_t* row_max_cols,
+    const float * x,
+    float * y
+)
+{
+  tt::tt_metal::IDevice* device = tt::daisy::get_device();
+  
+  std::vector<float> tilized_vals;
+  tt::daisy::tilize_buffer(tilized_vals, vals, nrow, ellpack_cols, ellpack_cols, 0.0f);
+  
   size_t vals_buffer_size = tilized_vals.size() * sizeof(float);
-  size_t vals_tile_size = tt_metal::detail::TileSize(tt::DataFormat::Float32);
+  size_t vals_tile_size = tt::tt_metal::detail::TileSize(tt::DataFormat::Float32);
   
   std::shared_ptr<tt::tt_metal::Buffer> d_ellpack_vals;
   if (vals_buffer_size > vals_tile_size) {
-    // Align buffer size to be divisible by tile size for interleaved buffers
     size_t aligned_vals_size = ((vals_buffer_size + vals_tile_size - 1) / vals_tile_size) * vals_tile_size;
     d_ellpack_vals = tt::tt_metal::CreateBuffer(tt::tt_metal::InterleavedBufferConfig{
       .device = device,
@@ -420,12 +554,66 @@ void tt_ellpack_matVec(const ELLPACKMatVecParams& params, const float * x, float
     });
   }
 
+  tt::tt_metal::EnqueueWriteBuffer(
+    device->command_queue(0),
+    d_ellpack_vals,
+    tilized_vals.data(),
+    true
+  );
+
+  return d_ellpack_vals;
+}
+
+void * _ZN2tt5daisy23tt_ellpack_matVec_in_0(
+    const float * vals,
+    const int * inds,
+    int nrow,
+    int ncol,
+    int ellpack_nnz,
+    int ellpack_cols,
+    const uint32_t* row_min_cols,
+    const uint32_t* row_max_cols,
+    const float * x,
+    float * y
+)
+{
+    return new std::shared_ptr<tt::tt_metal::Buffer>(_ZN2tt5daisy23tt_ellpack_matVec_in_0_impl(
+        vals,
+        inds,
+        nrow,
+        ncol,
+        ellpack_nnz,
+        ellpack_cols,
+        row_min_cols,
+        row_max_cols,
+        x,
+        y
+    ));
+}
+
+std::shared_ptr<tt::tt_metal::Buffer> _ZN2tt5daisy23tt_ellpack_matVec_in_1_impl(
+    const float * vals,
+    const int * inds,
+    int nrow,
+    int ncol,
+    int ellpack_nnz,
+    int ellpack_cols,
+    const uint32_t* row_min_cols,
+    const uint32_t* row_max_cols,
+    const float * x,
+    float * y
+)
+{
+  tt::tt_metal::IDevice* device = tt::daisy::get_device();
+  
+  std::vector<uint32_t> tilized_inds;
+  tt::daisy::tilize_buffer(tilized_inds, (const uint32_t*)inds, nrow, ellpack_cols, ellpack_cols, (uint32_t)UINT32_MAX);
+  
   size_t addrs_buffer_size = tilized_inds.size() * sizeof(uint32_t);
-  size_t addrs_tile_size = tt_metal::detail::TileSize(tt::DataFormat::UInt32);
+  size_t addrs_tile_size = tt::tt_metal::detail::TileSize(tt::DataFormat::UInt32);
   
   std::shared_ptr<tt::tt_metal::Buffer> d_ellpack_addrs;
   if (addrs_buffer_size > addrs_tile_size) {
-    // Align buffer size to be divisible by tile size for interleaved buffers
     size_t aligned_addrs_size = ((addrs_buffer_size + addrs_tile_size - 1) / addrs_tile_size) * addrs_tile_size;
     d_ellpack_addrs = tt::tt_metal::CreateBuffer(tt::tt_metal::InterleavedBufferConfig{
       .device = device,
@@ -442,18 +630,69 @@ void tt_ellpack_matVec(const ELLPACKMatVecParams& params, const float * x, float
     });
   }
 
+  tt::tt_metal::EnqueueWriteBuffer(
+    device->command_queue(0),
+    d_ellpack_addrs,
+    tilized_inds.data(),
+    false
+  );
+
+  return d_ellpack_addrs;
+}
+
+void * _ZN2tt5daisy23tt_ellpack_matVec_in_1(
+    const float * vals,
+    const int * inds,
+    int nrow,
+    int ncol,
+    int ellpack_nnz,
+    int ellpack_cols,
+    const uint32_t* row_min_cols,
+    const uint32_t* row_max_cols,
+    const float * x,
+    float * y
+)
+{
+    return new std::shared_ptr<tt::tt_metal::Buffer>(_ZN2tt5daisy23tt_ellpack_matVec_in_1_impl(
+        vals,
+        inds,
+        nrow,
+        ncol,
+        ellpack_nnz,
+        ellpack_cols,
+        row_min_cols,
+        row_max_cols,
+        x,
+        y
+    ));
+}
+
+std::shared_ptr<tt::tt_metal::Buffer> _ZN2tt5daisy23tt_ellpack_matVec_in_8_impl(
+    const float * vals,
+    const int * inds,
+    int nrow,
+    int ncol,
+    int ellpack_nnz,
+    int ellpack_cols,
+    const uint32_t* row_min_cols,
+    const uint32_t* row_max_cols,
+    const float * x,
+    float * y
+)
+{
+  tt::tt_metal::IDevice* device = tt::daisy::get_device();
+  
   // Create buffers for input and output vectors
-  size_t inVec_buffer_size = sizeof(float) * params.ncol;
-  size_t page_size = 1024;
+  size_t inVec_buffer_size = sizeof(float) * ncol;
   
   std::shared_ptr<tt::tt_metal::Buffer> d_inVec;
-  if (inVec_buffer_size > page_size) {
+  if (inVec_buffer_size > PAGE_SIZE) {
     // Align buffer size to be divisible by page size for interleaved buffers
-    size_t aligned_inVec_size = ((inVec_buffer_size + page_size - 1) / page_size) * page_size;
+    size_t aligned_inVec_size = ((inVec_buffer_size + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE;
     d_inVec = tt::tt_metal::CreateBuffer(tt::tt_metal::InterleavedBufferConfig{
       .device = device,
       .size = aligned_inVec_size,
-      .page_size = page_size,
+      .page_size = PAGE_SIZE,
       .buffer_type = tt::tt_metal::BufferType::DRAM
     });
   } else {
@@ -465,16 +704,68 @@ void tt_ellpack_matVec(const ELLPACKMatVecParams& params, const float * x, float
     });
   }
 
-  size_t resVec_buffer_size = sizeof(float) * params.nrow;
+  tt::tt_metal::EnqueueWriteBuffer(
+    device->command_queue(0),
+    d_inVec,
+    x,
+    false
+  );
+
+  return d_inVec;
+}
+
+void * _ZN2tt5daisy23tt_ellpack_matVec_in_8(
+    const float * vals,
+    const int * inds,
+    int nrow,
+    int ncol,
+    int ellpack_nnz,
+    int ellpack_cols,
+    const uint32_t* row_min_cols,
+    const uint32_t* row_max_cols,
+    const float * x,
+    float * y
+)
+{
+    return new std::shared_ptr<tt::tt_metal::Buffer>(_ZN2tt5daisy23tt_ellpack_matVec_in_8_impl(
+        vals,
+        inds,
+        nrow,
+        ncol,
+        ellpack_nnz,
+        ellpack_cols,
+        row_min_cols,
+        row_max_cols,
+        x,
+        y
+    ));
+}
+
+std::shared_ptr<tt::tt_metal::Buffer> _ZN2tt5daisy23tt_ellpack_matVec_in_9_impl(
+    const float * vals,
+    const int * inds,
+    int nrow,
+    int ncol,
+    int ellpack_nnz,
+    int ellpack_cols,
+    const uint32_t* row_min_cols,
+    const uint32_t* row_max_cols,
+    const float * x,
+    float * y
+)
+{
+  tt::tt_metal::IDevice* device = tt::daisy::get_device();
+  
+  size_t resVec_buffer_size = sizeof(float) * nrow;
   
   std::shared_ptr<tt::tt_metal::Buffer> d_resVec;
-  if (resVec_buffer_size > page_size) {
+  if (resVec_buffer_size > PAGE_SIZE) {
     // Align buffer size to be divisible by page size for interleaved buffers
-    size_t aligned_resVec_size = ((resVec_buffer_size + page_size - 1) / page_size) * page_size;
+    size_t aligned_resVec_size = ((resVec_buffer_size + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE;
     d_resVec = tt::tt_metal::CreateBuffer(tt::tt_metal::InterleavedBufferConfig{
       .device = device,
       .size = aligned_resVec_size,
-      .page_size = page_size,
+      .page_size = PAGE_SIZE,
       .buffer_type = tt::tt_metal::BufferType::DRAM
     });
   } else {
@@ -484,31 +775,63 @@ void tt_ellpack_matVec(const ELLPACKMatVecParams& params, const float * x, float
       .page_size = resVec_buffer_size,
       .buffer_type = tt::tt_metal::BufferType::DRAM
     });
-  }  
-  // Copy matrix data to device
-  tt::tt_metal::EnqueueWriteBuffer(
-    device->command_queue(0),
-    d_ellpack_vals,
-    tilized_vals.data(),
-    true
-  );
+  } 
 
-  tt::tt_metal::EnqueueWriteBuffer(
-    device->command_queue(0),
-    d_ellpack_addrs,
-    tilized_inds.data(),
-    false
-  );
+  return d_resVec;
+}
 
-  // Copy input vector to device
-  tt::tt_metal::EnqueueWriteBuffer(
-    device->command_queue(0),
-    d_inVec,
-    x,
-    false
-  );
+void * _ZN2tt5daisy23tt_ellpack_matVec_in_9(
+    const float * vals,
+    const int * inds,
+    int nrow,
+    int ncol,
+    int ellpack_nnz,
+    int ellpack_cols,
+    const uint32_t* row_min_cols,
+    const uint32_t* row_max_cols,
+    const float * x,
+    float * y
+)
+{
+    return new std::shared_ptr<tt::tt_metal::Buffer>(_ZN2tt5daisy23tt_ellpack_matVec_in_9_impl(
+        vals,
+        inds,
+        nrow,
+        ncol,
+        ellpack_nnz,
+        ellpack_cols,
+        row_min_cols,
+        row_max_cols,
+        x,
+        y
+    ));
+}
 
-    int num_tiles_r = (params.nrow + 31) / 32;
+void _ZN2tt5daisy23tt_ellpack_matVec_kernel(
+    const float * vals,
+    const int * inds,
+    int nrow,
+    int ncol,
+    int ellpack_nnz,
+    int ellpack_cols,
+    const uint32_t* row_min_cols,
+    const uint32_t* row_max_cols,
+    const float * x,
+    float * y,
+    void * d_ellpack_vals_ptr,
+    void * d_ellpack_addrs_ptr,
+    void * d_inVec_ptr,
+    void * d_resVec_ptr
+)
+{
+    auto d_ellpack_vals = *static_cast<std::shared_ptr<tt::tt_metal::Buffer>*>(d_ellpack_vals_ptr);
+    auto d_ellpack_addrs = *static_cast<std::shared_ptr<tt::tt_metal::Buffer>*>(d_ellpack_addrs_ptr);
+    auto d_inVec = *static_cast<std::shared_ptr<tt::tt_metal::Buffer>*>(d_inVec_ptr);
+    auto d_resVec = *static_cast<std::shared_ptr<tt::tt_metal::Buffer>*>(d_resVec_ptr);
+
+    tt::tt_metal::IDevice* device = tt::daisy::get_device();
+  
+    int num_tiles_r = (nrow + 31) / 32;
     std::vector<std::pair<uint32_t, uint32_t>> row_tile_min_max(num_tiles_r);
 
     for (int tr = 0; tr < num_tiles_r; ++tr) {
@@ -516,39 +839,98 @@ void tt_ellpack_matVec(const ELLPACKMatVecParams& params, const float * x, float
         uint32_t max_val = 0;
         for (int r = 0; r < 32; ++r) {
             int global_r = tr * 32 + r;
-            if (global_r >= params.nrow) break;
-            uint32_t row_min = params.row_min_cols[global_r];
-            uint32_t row_max = params.row_max_cols[global_r];
+            if (global_r >= nrow) break;
+            uint32_t row_min = row_min_cols[global_r];
+            uint32_t row_max = row_max_cols[global_r];
             if (row_min < min_val) min_val = row_min;
             if (row_max > max_val) max_val = row_max;
         }
         row_tile_min_max[tr] = {min_val, max_val};
     }
 
-  // Launch the matrix-vector multiplication kernel
-  auto e = std::getenv("TT_HPCCG_KERNEL_DIR");
-  std::filesystem::path kernel_dir = std::filesystem::path(e);
-  tt::daisy::tt_launch_ellpack_matVecOp(
-    device,
-    params.nrow,  // cell_count should be number of rows
-    params.ellpack_cols,   // ellpack_cols passed from caller
-    d_ellpack_vals,
-    d_ellpack_addrs,
-    *d_inVec,
-    *d_resVec,
-    kernel_dir,  // kernel directory
-    params.hw_impl,  // hardware implementation type
-    row_tile_min_max
-  );
-  // Read result back to host with non-blocking call
-  tt::tt_metal::EnqueueReadBuffer(
-    device->command_queue(0),
-    d_resVec,
-    y,
-    false
-  );
+    // Launch the matrix-vector multiplication kernel
+    auto e = std::getenv("TT_HPCCG_KERNEL_DIR");
+    std::filesystem::path kernel_dir = std::filesystem::path(e);
+    tt::daisy::tt_launch_ellpack_matVecOp(
+        device,
+        nrow,  // cell_count should be number of rows
+        ellpack_cols,   // ellpack_cols passed from caller
+        d_ellpack_vals,
+        d_ellpack_addrs,
+        *d_inVec,
+        *d_resVec,
+        kernel_dir,  // kernel directory
+        tt::daisy::EllpackHwImpl::FPU,  // hardware implementation type
+        row_tile_min_max
+    );
 
-  tt::tt_metal::Finish(device->command_queue(0));  
 }
 
-}   // namespace tt::daisy
+void _ZN2tt5daisy23tt_ellpack_matVec_out_9(
+    const float * vals,
+    const int * inds,
+    int nrow,
+    int ncol,
+    int ellpack_nnz,
+    int ellpack_cols,
+    const uint32_t* row_min_cols,
+    const uint32_t* row_max_cols,
+    const float * x,
+    float * y,
+    void * d_resVec_ptr
+)
+{
+    auto d_resVec = *static_cast<std::shared_ptr<tt::tt_metal::Buffer>*>(d_resVec_ptr);
+    tt::tt_metal::IDevice* device = tt::daisy::get_device();
+
+    tt::tt_metal::EnqueueReadBuffer(
+        device->command_queue(0),
+        d_resVec,
+        y,
+        false
+    );
+
+    tt::tt_metal::Finish(device->command_queue(0)); 
+}
+
+extern "C" void _ZN2tt5daisy23tt_ellpack_matVec_out_0(
+    const float * vals,
+    const int * inds,
+    int nrow,
+    int ncol,
+    int ellpack_nnz,
+    int ellpack_cols,
+    const uint32_t* row_min_cols,
+    const uint32_t* row_max_cols,
+    const float * x,
+    float * y,
+    void * d_ellpack_vals
+) {};
+
+extern "C" void _ZN2tt5daisy23tt_ellpack_matVec_out_1(
+    const float * vals,
+    const int * inds,
+    int nrow,
+    int ncol,
+    int ellpack_nnz,
+    int ellpack_cols,
+    const uint32_t* row_min_cols,
+    const uint32_t* row_max_cols,
+    const float * x,
+    float * y,
+    void * d_ellpack_addrs
+) {};
+
+extern "C" void _ZN2tt5daisy23tt_ellpack_matVec_out_8(
+    const float * vals,
+    const int * inds,
+    int nrow,
+    int ncol,
+    int ellpack_nnz,
+    int ellpack_cols,
+    const uint32_t* row_min_cols,
+    const uint32_t* row_max_cols,
+    const float * x,
+    float * y,
+    void * d_inVec
+) {};

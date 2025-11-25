@@ -67,6 +67,10 @@ using std::endl;
 #include "mytimer.hpp"
 #include "HPCCG.hpp"
 
+#ifdef USING_TT_RTL
+#include "tenstorrent/rtl/lib/ellpack_matVec.hpp"
+#endif
+
 #define TICK()  t0 = mytimer() // Use TICK and TOCK to time a code section
 #define TOCK(t) t += mytimer() - t0
 void HPCCG(HPC_Sparse_Matrix * A,
@@ -97,7 +101,24 @@ void HPCCG(HPC_Sparse_Matrix * A,
 
   // p is of length ncols, copy x to p for sparse MV operation
   TICK(); waxpby(nrow, 1.0f, x, 0.0f, x, p); TOCK(t2);
-  TICK(); HPC_sparsemv(A, p, Ap); TOCK(t3);
+  TICK();
+#ifdef USING_TT_RTL
+      _ZN2tt5daisy23tt_ellpack_matVec(
+          A->ellpack_vals,
+          A->ellpack_inds,
+          A->nrow,
+          A->ncol,
+          A->ellpack_nnz,
+          A->ellpack_cols,
+          A->ellpack_row_min_cols,
+          A->ellpack_row_max_cols,
+          p,
+          Ap
+      );  
+#else
+  HPC_sparsemv(A, p, Ap);
+#endif
+  TOCK(t3);
   TICK(); waxpby(nrow, 1.0f, b, -1.0f, Ap, r); TOCK(t2);
   TICK(); ddot(nrow, r, r, &rtrans, t4); TOCK(t1);
   normr = sqrtf(rtrans);
@@ -122,7 +143,24 @@ void HPCCG(HPC_Sparse_Matrix * A,
       cout << "Iteration = "<< k << "   Residual = "<< normr << endl;
      
 
-      TICK(); HPC_sparsemv(A, p, Ap); TOCK(t3); // 2*nnz ops
+      TICK();
+#ifdef USING_TT_RTL
+      _ZN2tt5daisy23tt_ellpack_matVec(
+          A->ellpack_vals,
+          A->ellpack_inds,
+          A->nrow,
+          A->ncol,
+          A->ellpack_nnz,
+          A->ellpack_cols,
+          A->ellpack_row_min_cols,
+          A->ellpack_row_max_cols,
+          p,
+          Ap
+      );  
+#else
+      HPC_sparsemv(A, p, Ap);
+#endif
+      TOCK(t3); // 2*nnz ops
       float alpha = 0.0f;
       TICK(); ddot(nrow, p, Ap, &alpha, t4); TOCK(t1); // 2*nrow ops
       alpha = rtrans/alpha;

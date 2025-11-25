@@ -5,7 +5,7 @@ project(daisy-tt-rt VERSION 0.0.1 DESCRIPTION "A library providing ELLPACK-based
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(CPM)
 
-add_library(daisy_tt_rt STATIC
+add_library(daisy_tt_rt SHARED
     lib/ellpack_matVec.cpp
 )
 target_include_directories(daisy_tt_rt PUBLIC
