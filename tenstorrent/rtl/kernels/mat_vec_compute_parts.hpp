@@ -101,17 +101,64 @@ static inline void unpacker_collect(
     
     DeviceZoneScopedN("Collect");
 
+    // State to track progress in each row across vector chunks
+    // Max 8 tiles per batch * 32 rows per tile = 256 rows
+    // We use uint8_t to store the current column index (0..32)
+    uint8_t row_progress[256];
+    for (int i = 0; i < 256; ++i) row_progress[i] = 0;
+
+    uint32_t num_tiles = end_tile - start_tile;
+
     for (uint32_t v = 0; v < vec_chunks; ++v) {
         if (load_vecs) {
             cb_wait_front(cb_vec, chunk_batch_size);
         }
         float* vec_ptr = reinterpret_cast<float*>(CB_RD_PTR(cb_vec));
+        uint32_t vec_chunk_start = v * vecs_per_chunk;
+        uint32_t vec_chunk_end = vec_chunk_start + vecs_per_chunk;
 
         uint32_t* tile_addr_ptr = addr_ptr;
         float* tile_collect_ptr = collect_ptr;
-        for (uint32_t i = start_tile; i < end_tile; ++i) {
-            // DPRINT << "Collecting for tile " << i << ", v" << v << ENDL();
-            collect_for_mul_tile(tile_addr_ptr, tile_collect_ptr, vec_ptr, v * vecs_per_chunk, vecs_per_chunk);
+        
+        for (uint32_t i = 0; i < num_tiles; ++i) {
+            // Process each row in the tile
+            for (int rowIdx = 0; rowIdx < 32; ++rowIdx) {
+                uint8_t colIdx = row_progress[i * 32 + rowIdx];
+                
+                if (colIdx >= 32) continue;
+
+                while (colIdx < 32) {
+                    // Calculate offset in faced layout
+                    uint32_t offset;
+                    if (rowIdx < 16) {
+                        if (colIdx < 16) offset = rowIdx * 16 + colIdx;
+                        else offset = 256 + rowIdx * 16 + (colIdx - 16);
+                    } else {
+                        if (colIdx < 16) offset = 512 + (rowIdx - 16) * 16 + colIdx;
+                        else offset = 768 + (rowIdx - 16) * 16 + (colIdx - 16);
+                    }
+
+                    uint32_t addr = tile_addr_ptr[offset];
+
+                    if (addr == UINT32_MAX) {
+                        colIdx = 32; // Done with this row (padding reached)
+                        break;
+                    }
+
+                    if (addr >= vec_chunk_end) {
+                        // Not in this chunk, but since sorted, subsequent cols are also >= end
+                        break;
+                    }
+
+                    if (addr >= vec_chunk_start) {
+                        // In range!
+                        float val = vec_ptr[addr - vec_chunk_start];
+                        tile_collect_ptr[offset] = val;
+                    }                    
+                    colIdx++;
+                }
+                row_progress[i * 32 + rowIdx] = colIdx;
+            }
 
             tile_addr_ptr += 1024;
             tile_collect_ptr += 1024;
