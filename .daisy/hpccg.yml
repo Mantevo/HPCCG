@@ -34,7 +34,7 @@ steps:
 
     # Build HPCCG with Tenstorrent rtl
     cd ../../../
-    docc-cpp -O3 -g -mllvm -docc-tune=none -DUSING_TT_RTL main.cpp generate_matrix.cpp HPCCG.cpp ddot.cpp HPC_sparsemv.cpp waxpby.cpp YAML_Doc.cpp YAML_Element.cpp mytimer.cpp -L./tenstorrent/rtl/build -lm -ldaisy_tt_rt -o hpccg.tenstorrent.out
+    docc-cpp -O3 -g -mllvm -docc-tune=none -DUSING_TT_RTL main.cpp generate_matrix.cpp HPCCG.cpp ddot.cpp HPC_sparsemv.cpp waxpby.cpp YAML_Doc.cpp YAML_Element.cpp mytimer.cpp -lm -L./tenstorrent/rtl/build -ldaisy_tt_rt -o hpccg.tenstorrent.out
 
   run:
     hpccg:

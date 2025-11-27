@@ -1,6 +1,7 @@
 .vscode/
 
 build/
+cmake-*/
 
 *.bc
 *.o
@@ -10,3 +11,7 @@ build/
 *.dot
 *.json
 *.txt
+
+*-local/
+
+hpccg-1.0*.yaml

@@ -1,4 +1,6 @@
 #include "ellpack_matVec.hpp"
+#include "tt_device_holder.hpp"
+
 #include "hostdevcommon/kernel_structs.h"
 #include "tt-metalium/buffer.hpp"
 #include "tt-metalium/tt_backend_api_types.hpp"
@@ -15,24 +17,6 @@
 #define PAGE_SIZE 1024u
 
 namespace tt::daisy {
-
-// Global device pointer
-static tt::tt_metal::IDevice* g_device = nullptr;
-
-// Initialize the global device
-static tt::tt_metal::IDevice* get_device() {
-    if (g_device == nullptr) {
-        g_device = tt_metal::CreateDevice(0);
-        // Register cleanup function to run at program exit
-        std::atexit([]() {
-            if (g_device != nullptr) {
-                tt_metal::CloseDevice(g_device);
-                g_device = nullptr;
-            }
-        });
-    }
-    return g_device;
-}
 
 template<typename T>
 void tilize_buffer(std::vector<T>& out, const T* in, int rows, int cols, int ellpack_cols, T pad_value) {
@@ -849,7 +833,10 @@ void _ZN2tt5daisy23tt_ellpack_matVec_kernel(
     }
 
     // Launch the matrix-vector multiplication kernel
-    auto e = std::getenv("TT_HPCCG_KERNEL_DIR");
+    const char* e = std::getenv("TT_HPCCG_KERNEL_DIR");
+    if (!e) {
+        e = "tenstorrent/rtl/kernels";
+    }
     std::filesystem::path kernel_dir = std::filesystem::path(e);
     tt::daisy::tt_launch_ellpack_matVecOp(
         device,
