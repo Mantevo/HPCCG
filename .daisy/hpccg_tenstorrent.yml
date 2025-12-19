@@ -5,7 +5,7 @@ on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
   schedule:
-    - cron: "0 2 * * *"
+    - cron: "0 0 * * 4"
 
 parameters:
   container: daisytuner/x64-tenstorrent:0.63.0-latest
@@ -16,12 +16,6 @@ parameters:
 steps:
   build: |
     export DOCC_CI=regions
-
-    # Baseline
-    docc-cpp -O3 -g -mllvm -docc-tune=none main.cpp generate_matrix.cpp HPCCG.cpp ddot.cpp HPC_sparsemv.cpp waxpby.cpp YAML_Doc.cpp YAML_Element.cpp mytimer.cpp -lm -o hpccg.out
-    
-    # Auto-parallelized with OpenMP
-    docc-cpp -O3 -g -mllvm -docc-tune=openmp -mllvm -docc-einsum main.cpp generate_matrix.cpp HPCCG.cpp ddot.cpp HPC_sparsemv.cpp waxpby.cpp YAML_Doc.cpp YAML_Element.cpp mytimer.cpp -lm -lblas -o hpccg.openmp.out
 
     # Auto-offloaded to Tenstorrent (temporarily: rtl)
 
@@ -44,19 +38,11 @@ steps:
 
     # Build HPCCG with Tenstorrent rtl
     cd ../../../
-    docc-cpp -O3 -g -mllvm -docc-tune=tenstorrent -mllvm -docc-einsum -mllvm -docc-offloading-force-synchronous -DUSING_TT_RTL main.cpp generate_matrix.cpp HPCCG.cpp ddot.cpp HPC_sparsemv.cpp waxpby.cpp YAML_Doc.cpp YAML_Element.cpp mytimer.cpp -lm -L./tenstorrent/rtl/build -ldaisy_tt_rt -o hpccg.tenstorrent.out
+    docc-cpp -O3 -g -docc-tune=tenstorrent -docc-einsum -docc-offloading-force-synchronous -DUSING_TT_RTL main.cpp generate_matrix.cpp HPCCG.cpp ddot.cpp HPC_sparsemv.cpp waxpby.cpp YAML_Doc.cpp YAML_Element.cpp mytimer.cpp -lm -L./tenstorrent/rtl/build -ldaisy_tt_rt -o hpccg.tenstorrent.out
 
   run:
-    hpccg:
-      command: ./hpccg.out 50 50 50
-      energy: true
-    hpccg_openmp:
-      command: ./hpccg.openmp.out 50 50 50
-      energy: true
-      env:
-        OMP_NUM_THREADS: 8
     hpccg_tenstorrent:
-      command: ./hpccg.tenstorrent.out 50 50 50
+      command: ./hpccg.tenstorrent.out 100 100 100
       energy: true
       env:
         TT_HPCCG_KERNEL_DIR: /workspace/tenstorrent/rtl/kernels

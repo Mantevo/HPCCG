@@ -5,10 +5,10 @@ on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
   schedule:
-    - cron: "0 2 * * *"
+    - cron: "0 0 * * 4"
 
 parameters:
-  container: daisytuner/x64-tenstorrent:0.63.0-latest
+  container: daisytuner/docc-build-env-llvm19:latest-amd64
   timeout: 60
   partitions:
     - zinnia
@@ -23,20 +23,12 @@ steps:
     # Auto-parallelized with OpenMP
     docc-cpp -O3 -g -mllvm -docc-tune=openmp -mllvm -docc-einsum main.cpp generate_matrix.cpp HPCCG.cpp ddot.cpp HPC_sparsemv.cpp waxpby.cpp YAML_Doc.cpp YAML_Element.cpp mytimer.cpp -lm -lblas -o hpccg.openmp.out
 
-    # Auto-offloaded to CUDA
-    export LIBRARY_PATH=$LIBRARY_PATH:/usr/local/cuda/lib64
-    docc-cpp -O3 -g -mllvm -docc-tune=cuda -mllvm -docc-offloading-force-synchronous main.cpp generate_matrix.cpp HPCCG.cpp ddot.cpp HPC_sparsemv.cpp waxpby.cpp YAML_Doc.cpp YAML_Element.cpp mytimer.cpp -lm -lcublas -o hpccg.cuda.out
-
   run:
     hpccg:
-      command: ./hpccg.out 50 50 50
+      command: ./hpccg.out 100 100 100
       energy: true
     hpccg_openmp:
-      command: ./hpccg.openmp.out 50 50 50
+      command: ./hpccg.openmp.out 100 100 100
       energy: true
       env:
         OMP_NUM_THREADS: 8
-    hpccg_cuda:
-      command: ./hpccg.cuda.out 50 50 50
-      energy: true
-
