@@ -9,9 +9,13 @@ on:
 
 parameters:
   container: daisytuner/x64-tenstorrent:0.63.0-latest
+  dist_platform:
+    os: linux
+    os_release:
+      id: ubuntu
+      version_id: "24.04"
   timeout: 90
-  partitions:
-    - zinnia-ci
+  accelerator: tenstorrent_blackhole
   docc_version: 0.2.14
 
 steps:
